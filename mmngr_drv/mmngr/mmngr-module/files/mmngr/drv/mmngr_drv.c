@@ -638,7 +638,9 @@ static int mm_ioc_alloc(struct device *mm_dev,
 	}
 
 #ifdef IPMMU_MMU_SUPPORT
-	out->hard_addr = ipmmu_mmu_phys2virt(out->phy_addr);
+	ret = ipmmu_mmu_phys2virt(out->phy_addr, &out->hard_addr);
+	if (ret < 0)
+		return ret;
 #else
 	out->hard_addr = (unsigned int)out->phy_addr;
 #endif
@@ -762,7 +764,9 @@ static int mm_ioc_alloc_co(struct BM *pb, int __user *in, struct MM_PARAM *out)
 	out->phy_addr = pb->top_phy_addr + (start_bit << pb->order);
 
 #ifdef IPMMU_MMU_SUPPORT
-	out->hard_addr = ipmmu_mmu_phys2virt(out->phy_addr);
+	ret = ipmmu_mmu_phys2virt(out->phy_addr, &out->hard_addr);
+	if (ret < 0)
+		return ret;
 #else
 	out->hard_addr = (unsigned int)out->phy_addr;
 #endif
@@ -2064,24 +2068,25 @@ static void ipmmu_mmu_deinitialize(void)
 	__handle_registers(&ipmmumm, DO_IOUNMAP);
 }
 
-static unsigned int ipmmu_mmu_phys2virt(phys_addr_t paddr)
+static int ipmmu_mmu_phys2virt(phys_addr_t paddr, unsigned int *vaddr)
 {
-	unsigned int	vaddr = 0;
 	int		section = 0;
 
-	pr_debug("p2v: before: paddr 0x%llx vaddr 0x%x\n", paddr, vaddr);
+	pr_debug("p2v: before: paddr 0x%llx vaddr 0x%x\n", paddr, *vaddr);
 
 	for (section = 0; section < 4; section++) {
 		if ((paddr >= ipmmu_mmu_trans_table[section]) &&
 		    (paddr < ipmmu_mmu_trans_table[section] + SZ_1G)) {
-			vaddr = section * SZ_1G;
-			vaddr |= paddr & 0x3fffffff;
+			*vaddr = section * SZ_1G;
+			*vaddr |= paddr & 0x3fffffff;
+			pr_debug("p2v: after: paddr 0x%llx vaddr 0x%x\n", paddr, *vaddr);
+			return 0;
 		}
 	}
 
-	pr_debug("p2v: after: paddr 0x%llx vaddr 0x%x\n", paddr, vaddr);
+	pr_debug("p2v: after: paddr 0x%llx vaddr 0x%x\n", paddr, *vaddr);
 
-	return vaddr;
+	return -EFAULT;
 }
 
 static phys_addr_t ipmmu_mmu_virt2phys(unsigned int vaddr)
