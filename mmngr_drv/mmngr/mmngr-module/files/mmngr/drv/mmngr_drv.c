@@ -1637,14 +1637,18 @@ static int ipmmu_probe(struct platform_device *pdev)
 	else
 		is_mmu_tlb_disabled = false;
 
-	if (soc_device_match(r8a7796))
+	if (soc_device_match(r8a7796) || soc_device_match(r8a7796es1))
 		ipmmu_mmu_trans_table = m3_mmu_table;
 	else if (soc_device_match(r8a77965))
 		ipmmu_mmu_trans_table = m3n_mmu_table;
 	else if (soc_device_match(r8a77990))
 		ipmmu_mmu_trans_table = e3_mmu_table;
-	else /* H3 */
+	else if (soc_device_match(r8a7795)) 
 		ipmmu_mmu_trans_table = h3_mmu_table;
+	else {
+		pr_err("%s Invalid SoC ID\n", __func__);
+		return -EINVAL;
+	}
 
 	ipmmu_addr_section_0 = ipmmu_mmu_trans_table[0];
 	ipmmu_addr_section_1 = ipmmu_mmu_trans_table[1];
